@@ -65,20 +65,45 @@ def discover_rss(con, source: dict, lookback_days: int | None) -> int:
     return added
 
 
-def discover_search(con, source: dict, queries: list[dict], max_per_source: int) -> int:
+def discover_search(con, source: dict, queries: list[dict], max_per_source: int,
+                    max_queries: int = 20, time_budget_s: float = 120.0) -> int:
     """Query the outlet's on-site search for each species×keyword term and scrape
     result-page links. Search-result HTML varies per site, so we extract anchor
     hrefs that look like article URLs on the same host and let the fetch+extract
-    stages decide. Best-effort; a site whose search blocks us is logged."""
+    stages decide. Best-effort; a site whose search blocks us is logged.
+
+    BOUNDED so one site can't stall the run: at most `max_queries` search terms
+    per source AND a `time_budget_s` wall-clock cap. RSS is the primary channel;
+    on-site search is a supplementary sweep, not an exhaustive 190-query crawl."""
     tmpl = source.get("search_url")
     if not tmpl:
         return 0
-    import re
+    import re, time as _t
     from bs4 import BeautifulSoup
     host = urllib.parse.urlparse(tmpl).netloc
     seen, rows = set(), []
+    started = _t.time()
+    # Interleave round-robin by species so a small cap spans many species rather
+    # than exhausting the budget on the first species' 10 keywords.
+    by_sp = {}
     for q in queries:
+        by_sp.setdefault(q.get("species", ""), []).append(q)
+    interleaved, buckets = [], list(by_sp.values())
+    i = 0
+    while len(interleaved) < len(queries):
+        b = buckets[i % len(buckets)]
+        idx = i // len(buckets)
+        if idx < len(b):
+            interleaved.append(b[idx])
+        i += 1
+        if i > len(queries) * 2:
+            break
+    for qi, q in enumerate(interleaved[:max_queries]):
         if len(rows) >= max_per_source:
+            break
+        if _t.time() - started > time_budget_s:
+            cache.log_liveness(con, source["key"], tmpl, "search", len(rows) > 0, len(rows),
+                               note=f"time budget {time_budget_s:.0f}s hit after {qi} queries")
             break
         url = tmpl.replace("{q}", urllib.parse.quote(q["query"]))
         try:

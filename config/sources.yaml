@@ -18,6 +18,11 @@ defaults:
   request_delay_seconds: 4        # min seconds between requests to the SAME host
   timeout_seconds: 20
   max_candidates_per_source: 60   # cap per source per run (weekly incremental)
+  # On-site search is a SUPPLEMENTARY sweep (RSS is primary). Bound it hard so one
+  # slow site can't stall the run: at most N search terms AND a wall-clock cap per
+  # source. Without these, 190 queries x ~4s/query x 19 sites = hours.
+  search_max_queries: 15          # top search terms per source per run
+  search_time_budget_s: 90        # wall-clock seconds per source for on-site search
   respect_robots: true
   user_agents:                    # rotated per request
     - "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36"

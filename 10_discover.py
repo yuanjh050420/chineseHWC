@@ -32,7 +32,15 @@ def main():
     ap.add_argument("--sources", help="comma-separated source keys to limit to")
     ap.add_argument("--no-search", action="store_true", help="skip on-site search (RSS feeds only)")
     ap.add_argument("--no-rss", action="store_true", help="skip RSS (on-site search only)")
+    ap.add_argument("--search-max-queries", type=int, default=0, help="cap on-site search terms per source (0=config default)")
+    ap.add_argument("--search-time-budget", type=float, default=0, help="wall-clock seconds per source for on-site search (0=config default)")
+    ap.add_argument("--with-search", action="store_true", help="enable on-site search sweep (weekly runs are RSS-only unless set; search is bounded and best from a home IP)")
     args = ap.parse_args()
+    # Weekly runs default to RSS-only: RSS is the primary channel and reliable from
+    # any IP, while on-site search is slow and low-yield from datacenter IPs. Enable
+    # search explicitly with --with-search (recommended when running from a home IP).
+    if args.weekly and not args.with_search:
+        args.no_search = True
 
     st = search_terms()
     lookback = st.get("weekly_lookback_days") if args.weekly and not args.full else None
@@ -49,7 +57,11 @@ def main():
         if not args.no_rss:
             r = discover.discover_rss(con, s, lookback)
         if not args.seed_liveness and not args.no_search:
-            sr = discover.discover_search(con, s, queries, s.get("max_candidates_per_source", 60))
+            defs = discover._sources().get("defaults", {})
+            sr = discover.discover_search(
+                con, s, queries, s.get("max_candidates_per_source", 60),
+                max_queries=args.search_max_queries or defs.get("search_max_queries", 20),
+                time_budget_s=args.search_time_budget or defs.get("search_time_budget_s", 120))
         totals["rss"] += r; totals["search"] += sr
         print(f"[discover] {s['key']:<12} rss={r:<4} search={sr:<4}", flush=True)
 
