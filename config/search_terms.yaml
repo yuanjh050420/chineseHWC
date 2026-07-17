@@ -1,0 +1,27 @@
+# Chinese search terms — from Supplementary Table 1 of the manuscript.
+# Discovery builds queries as: "中国" + <species term> + <conflict keyword>
+# (mirrors the paper's "China [species name] [conflict-related keyword]" string).
+#
+# Species terms live in config/schema.yaml (species[].chinese). This file holds the
+# conflict keywords and the query-assembly settings so both are tunable without code.
+
+# 10 conflict-related keywords (Chinese : English gloss), Supplementary Table 1.
+conflict_keywords:
+  伤人:     hurting people
+  入室:     entry into homes
+  牲畜:     livestock
+  捕食家畜: predation on domestic animals
+  蜂箱:     beehives
+  庄稼:     crops
+  冲突:     conflict
+  财产:     property
+  救助:     rescue
+  咬死:     bite to death
+
+# Query assembly.
+country_prefix: "中国"          # "China", prepended to every query (paper's search string)
+join: " "                       # space between prefix, species term, keyword
+
+# Recency window for the WEEKLY incremental run: only keep candidates newer than
+# (today - lookback_days). Set generous to absorb reporting lag; dedup handles overlap.
+weekly_lookback_days: 21

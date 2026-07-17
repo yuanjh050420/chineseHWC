@@ -1,0 +1,87 @@
+# Curated news sources — derived empirically from the 520 source URLs in the
+# published database, plus the 4 Taiwan outlets named in the manuscript.
+#
+# IMPORTANT REALITY CHECK (recall risk, read this):
+#   Most mainland Chinese portals (sina, sohu, 163, qq, ifeng...) discontinued
+#   public RSS years ago. Only some outlets (chinanews, people, CNR, several
+#   Taiwan sites) still publish usable feeds. For each outlet we therefore list:
+#     rss:        candidate feed URLs (may 404 — the discover stage PROBES each
+#                 at runtime and logs which are live; unverified until then).
+#     search_url: an on-site search template ({q} = URL-encoded query) used as a
+#                 discovery fallback where a feed is absent/dead.
+#   The discover stage records a per-source liveness report so recall is auditable.
+#   The 'discover ranking' of an outlet (# of historical hits) is in `hist_hits`.
+#
+# fetch_policy: per-host politeness (seconds between requests) + max candidates/run.
+
+defaults:
+  request_delay_seconds: 4        # min seconds between requests to the SAME host
+  timeout_seconds: 20
+  max_candidates_per_source: 60   # cap per source per run (weekly incremental)
+  respect_robots: true
+  user_agents:                    # rotated per request
+    - "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36"
+    - "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+    - "Mozilla/5.0 (X11; Linux x86_64; rv:127.0) Gecko/20100101 Firefox/127.0"
+
+# ---- Optional, OFF by default. General-engine aggregator, OUTSIDE the curated
+#      outlet list. The user chose "named news sites + RSS only"; enable this only
+#      if curated recall proves too low. Set enabled: true to opt in.
+google_news_rss:
+  enabled: false
+  endpoint: "https://news.google.com/rss/search?q={q}&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
+  note: "Aggregates general search results, not restricted to curated outlets. Opt-in fallback only."
+
+# ---- Curated mainland outlets. hist_hits = # of the 520 historical URLs whose
+#      registrable domain maps to this outlet (0 = named as plausible but not in
+#      the 520 set). Listed by outlet, not strictly hit-ordered. ----
+sources:
+  - {key: chinanews,  name: 中国新闻网 China News,   region: mainland, hist_hits: 54,
+     rss: ["https://www.chinanews.com.cn/rss/scroll-news.xml", "https://www.chinanews.com.cn/rss/society.xml"],
+     search_url: "https://sou.chinanews.com.cn/search.do?q={q}"}
+  - {key: cnr,        name: 央广网 CNR,             region: mainland, hist_hits: 25,
+     rss: ["http://news.cnr.cn/rss/"], search_url: "https://so.cnr.cn/pc/websearch/searchList?keyword={q}"}
+  - {key: thepaper,   name: 澎湃新闻 The Paper,      region: mainland, hist_hits: 20,
+     rss: [], search_url: "https://www.thepaper.cn/searchResult?query={q}",
+     note: "No public RSS; JS-heavy search — fetch stage may need rendering. Low feed confidence."}
+  - {key: people,     name: 人民网 People,          region: mainland, hist_hits: 11,
+     rss: ["http://www.people.com.cn/rss/politics.xml", "http://www.people.com.cn/rss/society.xml"],
+     search_url: "http://search.people.com.cn/s?keyword={q}"}
+  - {key: cctv,       name: 央视网 CCTV,            region: mainland, hist_hits: 40,
+     rss: [], search_url: "https://search.cctv.com/search.php?qtext={q}&type=web",
+     note: "No usable RSS; search fallback only."}
+  - {key: sina,       name: 新浪新闻 Sina,          region: mainland, hist_hits: 53,
+     rss: [], search_url: "https://search.sina.com.cn/?q={q}&c=news",
+     note: "RSS discontinued; search fallback."}
+  - {key: sohu,       name: 搜狐新闻 Sohu,          region: mainland, hist_hits: 45,
+     rss: [], search_url: "https://search.sohu.com/?keyword={q}", note: "RSS discontinued; search fallback."}
+  - {key: netease,    name: 网易新闻 NetEase,        region: mainland, hist_hits: 11,
+     rss: [], search_url: "https://www.163.com/search?keyword={q}", note: "RSS mostly dead; search fallback."}
+  - {key: ifeng,      name: 凤凰网 iFeng,           region: mainland, hist_hits: 10,
+     rss: [], search_url: "https://so.ifeng.com/?q={q}&c=1", note: "RSS mostly dead; search fallback."}
+  - {key: huanqiu,    name: 环球网 Huanqiu,          region: mainland, hist_hits: 8,
+     rss: [], search_url: "https://s.huanqiu.com/s?q={q}"}
+  - {key: gmw,        name: 光明网 Guangming,        region: mainland, hist_hits: 5,
+     rss: ["http://www.gmw.cn/rss/"], search_url: "https://s.gmw.cn/?q={q}"}
+  - {key: dbw,        name: 东北网 Dongbei (Heilongjiang), region: mainland, hist_hits: 18,
+     rss: [], search_url: "https://sou.dbw.cn/search?q={q}", note: "Strong NE-China / bear coverage historically."}
+  - {key: qq_news,    name: 腾讯新闻 QQ News,        region: mainland, hist_hits: 22,
+     rss: [], search_url: "https://www.sogou.com/sogou?query={q}&interation=1728053249",
+     note: "QQ has no open search; content mostly via aggregators."}
+  - {key: chinadaily, name: 中国日报 China Daily,     region: mainland, hist_hits: 0,
+     rss: ["http://www.chinadaily.com.cn/rss/china_rss.xml"], search_url: "https://newssearch.chinadaily.com.cn/en/search?query={q}",
+     note: "Not in the 520 historical set; added as a plausible national outlet with a live RSS feed."}
+
+# ---- Taiwan outlets (manuscript named ltn, epochtimes, pts, ettoday) ----
+taiwan_sources:
+  - {key: ltn,        name: 自由時報 Liberty Times,  region: taiwan, hist_hits: 15,
+     rss: ["https://news.ltn.com.tw/rss/all.xml"], search_url: "https://search.ltn.com.tw/list?keyword={q}"}
+  - {key: ettoday,    name: ETtoday,               region: taiwan, hist_hits: 6,
+     rss: ["https://feeds.feedburner.com/ettoday/realtime"], search_url: "https://www.ettoday.net/news_search/doSearch.php?keywords={q}"}
+  - {key: epochtimes, name: 大紀元 Epoch Times,      region: taiwan, hist_hits: 7,
+     rss: ["https://www.epochtimes.com/b5/nsc402.xml"], search_url: "https://www.epochtimes.com/b5/search.htm?q={q}"}
+  - {key: pts,        name: 公視新聞 PTS,            region: taiwan, hist_hits: 0,
+     rss: ["https://news.pts.org.tw/rss"], search_url: "https://news.pts.org.tw/search/{q}",
+     note: "Named in manuscript; no historical hits in the 520 set."}
+  - {key: einfo_tw,   name: 環境資訊中心 e-info,      region: taiwan, hist_hits: 2,
+     rss: ["https://e-info.org.tw/rss.xml"], search_url: "https://e-info.org.tw/search/node/{q}"}

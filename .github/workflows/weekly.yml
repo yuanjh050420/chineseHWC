@@ -1,0 +1,112 @@
+name: Weekly HWC monitor
+
+# Runs every Monday 06:00 UTC (14:00 Beijing). Also runnable on demand.
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch: {}
+
+# Allow the job to commit data back and publish Pages.
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+  issues: write
+
+concurrency:
+  group: weekly-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Resolve Anthropic key (tolerant of common secret names)
+        env:
+          # We check several common names so the run works whatever you called it.
+          K1: ${{ secrets.ANTHROPIC_API_KEY }}
+          K2: ${{ secrets.ANTHROPIC_KEY }}
+          K3: ${{ secrets.CLAUDE_API_KEY }}
+        run: |
+          KEY="${K1:-${K2:-${K3:-}}}"
+          if [ -z "$KEY" ]; then
+            echo "::error::No Anthropic API key found. Add a repo secret named"
+            echo "::error::ANTHROPIC_API_KEY (Settings -> Secrets and variables -> Actions)."
+            exit 1
+          fi
+          echo "ANTHROPIC_API_KEY=$KEY" >> "$GITHUB_ENV"
+          echo "Anthropic key resolved (${#KEY} chars)."
+
+      - name: Run weekly pipeline
+        env:
+          HWC_EXTRACT_MODEL: claude-3-5-haiku-latest
+          GEOCODE_CONTACT_EMAIL: ${{ secrets.GEOCODE_CONTACT_EMAIL }}
+        run: bash run_weekly.sh
+
+      - name: Summarize pending review queue
+        id: review
+        run: |
+          if [ -f data/master/review_queue.csv ]; then
+            N=$(( $(wc -l < data/master/review_queue.csv) - 1 ))
+          else
+            N=0
+          fi
+          echo "count=$N" >> "$GITHUB_OUTPUT"
+          echo "Pending review rows: $N"
+
+      - name: Commit updated data + dashboard
+        run: |
+          git config user.name  "hwc-monitor-bot"
+          git config user.email "actions@github.com"
+          git add data/master/incidents.csv data/master/review_queue.csv docs/index.html || true
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "weekly update $(date -u +%Y-%m-%d): refresh incidents + dashboard"
+            git push
+          fi
+
+      - name: Open review issue if rows are pending
+        if: steps.review.outputs.count != '0'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const n = '${{ steps.review.outputs.count }}';
+            await github.rest.issues.create({
+              owner: context.repo.owner, repo: context.repo.repo,
+              title: `Review ${n} pending conflict incident(s) — ${new Date().toISOString().slice(0,10)}`,
+              body: [
+                `The weekly monitor extracted **${n}** incident(s) flagged for human review`,
+                `(low confidence, unresolved location, or missing date).`,
+                ``,
+                `They are in \`data/master/review_queue.csv\` and are **not** on the dashboard yet.`,
+                ``,
+                `**To confirm:** open that file, delete bad rows, set \`keep=1\` on good ones,`,
+                `then run \`./50_store.py --promote\` (locally or re-dispatch the workflow after committing).`,
+              ].join("\n"),
+            });
+
+  # Publish docs/ to GitHub Pages after data is committed.
+  deploy-pages:
+    needs: monitor
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4

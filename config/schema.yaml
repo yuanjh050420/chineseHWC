@@ -1,0 +1,80 @@
+# Incident schema — matches the columns of the published database (All_species.csv).
+# Every stage reads/writes rows in this shape. The weekly job appends to the master
+# store using exactly these columns so historical (520 seed) and new rows are uniform.
+
+columns:
+  - Species                        # canonical English common name (see species list below)
+  - No.                            # stable incident id, e.g. ABB001; auto-assigned per species prefix
+  - Year                           # int, >= 2005
+  - Month                          # int 1-12 (month precision is the minimum acceptable per inclusion criteria)
+  - Province                       # Chinese text, e.g. 四川省
+  - County                         # Chinese text, e.g. 宝兴县
+  - District                       # Chinese free text, most specific place named (>= township)
+  - Longitude                      # decimal degrees (WGS84), from geocode stage
+  - Latitude                       # decimal degrees (WGS84), from geocode stage
+  - Type of conflict (standard)    # one of conflict_types below
+  - Victem                         # victim type (original DB spelling kept for schema compatibility); may be blank
+  - Number of victems              # int or blank
+  - Number of deaths               # int or blank
+  - URL                            # source article URL
+
+# Provenance columns appended by the monitor (not in the original DB; kept after the 14 canonical ones).
+# The dashboard and dedup logic use these; the seed rows get source='seed_2025_manuscript'.
+provenance_columns:
+  - source            # 'seed_2025_manuscript' for the 520 historical rows; 'monitor' for new automated rows
+  - discovered_date   # ISO date the article was discovered by the crawler
+  - extract_model     # LLM model id used for extraction (blank for seed)
+  - extract_confidence # 0-1 model self-reported confidence (blank for seed)
+  - title             # article headline as discovered
+  - needs_review      # 1 if flagged for human review (low confidence / ambiguous); recall-favoring policy
+  # -- Geocoding provenance (gazetteer point-radius method; see docs/crawling_notes + geocode-news skill) --
+  # IMPORTANT: the 520 historical rows were geocoded MANUALLY via Google Maps to township precision,
+  # as bare points with no uncertainty. We do NOT re-geocode them (that would coarsen good coords).
+  # New monitor rows are geocoded automatically WITH an uncertainty radius. These columns record which
+  # regime a row's coordinates came from so analysis/maps can distinguish and weight them.
+  - geocode_source    # 'manual_googlemaps_2025' for seed rows; 'nominatim/OSM' or 'amap/高德' for new rows
+  - coordinateUncertaintyInMeters  # radius of the point-radius georeference (blank/unknown for manual seed)
+  - geocode_matched   # the admin string the gazetteer actually matched (provenance for the point)
+
+# The 7 standardized conflict-type categories present in the published database.
+# (The manuscript groups these into 4 higher-level types for Fig 2; grouping map below.)
+conflict_types:
+  - Attack livestock
+  - Enter human settlements
+  - Attack human
+  - Damage property
+  - Damage beehive
+  - Attack domestic dog
+  - Damage crops
+
+# Higher-level grouping used in the manuscript figures (Fig 2B).
+conflict_type_groups:
+  "Livestock/dog attack": [Attack livestock, Attack domestic dog]
+  "Property damage":       [Damage property, Damage beehive, Damage crops]
+  "Human settlement entry": [Enter human settlements]
+  "Human attack":          [Attack human]
+
+# Victim vocabulary observed in the DB (open set; extractor may emit a compound like "Goose+Duck").
+# "Poultry" pools chicken/duck/goose in the manuscript's Fig 3.
+victim_examples: [Human, Sheep, Cow, Goat, Yak, Horse, Camel, Pig, Dog, Chicken, Duck, Goose, Rabbit]
+poultry_members: [Chicken, Duck, Goose]
+
+# Surplus-killing flag (manuscript threshold): a single event with > 2 fatalities.
+surplus_killing_fatality_threshold: 2
+
+# The 13 large carnivore species native to China (>15 kg). 10 have conflict records in the DB.
+# chinese = search names from Supplementary Table 1 (common + subspecies names).
+species:
+  - {english: Asiatic Black Bear,  scientific: Ursus thibetanus,     id_prefix: ABB, chinese: ["黑熊"],                marginal: false}
+  - {english: Brown Bear,          scientific: Ursus arctos,         id_prefix: BB,  chinese: ["棕熊", "藏马熊"],        marginal: false}
+  - {english: Sun Bear,            scientific: Helarctos malayanus,  id_prefix: SUB, chinese: ["马来熊"],               marginal: true}
+  - {english: Snow Leopard,        scientific: Panthera uncia,       id_prefix: SL,  chinese: ["雪豹"],                marginal: false}
+  - {english: Leopard,             scientific: Panthera pardus,      id_prefix: LEO, chinese: ["豹", "华北豹", "东北豹"], marginal: false}
+  - {english: Tiger,               scientific: Panthera tigris,      id_prefix: TIG, chinese: ["虎", "东北虎"],          marginal: false}
+  - {english: Clouded Leopard,     scientific: Neofelis nebulosa,    id_prefix: CL,  chinese: ["云豹"],                marginal: false}
+  - {english: Asiatic Golden Cat,  scientific: Catopuma temminckii,  id_prefix: AGC, chinese: ["金猫", "黄虎"],          marginal: false}
+  - {english: Eurasian Lynx,       scientific: Lynx lynx,            id_prefix: LYN, chinese: ["猞猁"],                marginal: false}
+  - {english: Grey Wolf,           scientific: Canis lupus,          id_prefix: GW,  chinese: ["狼"],                  marginal: false}
+  - {english: Golden Jackal,       scientific: Canis aureus,         id_prefix: GJ,  chinese: ["亚洲胡狼"],             marginal: true}
+  - {english: Dhole,               scientific: Cuon alpinus,         id_prefix: DH,  chinese: ["豺"],                  marginal: false}
+  - {english: Wolverine,           scientific: Gulo gulo,            id_prefix: WOL, chinese: ["貂熊", "狼獾"],          marginal: true}

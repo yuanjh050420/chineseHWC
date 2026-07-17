@@ -1,0 +1,13 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+# Caches & intermediates are rebuildable; keep them out of git.
+data/cache.sqlite
+data/raw/
+data/discover/
+data/geocode/
+# The master store CSV IS committed (weekly job commits it back); parquet is derived.
+data/master/incidents.parquet
+benchmark/*_articles/
