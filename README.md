@@ -58,12 +58,23 @@ python 10_discover.py --seed-liveness   # probe which feeds are actually live
 
 ## Deployment
 
-- **Weekly automation:** `.github/workflows/weekly.yml` (GitHub Actions cron,
-  commits data back, publishes Pages, opens a review issue).
-- **Mac fallback:** `deploy/launchd_setup.md` (run on a home IP if the cloud
-  gets bot-blocked).
-- **WordPress embed:** `deploy/wordpress_embed.md` (push to GitHub, enable Pages,
-  iframe into rolandkays.com; public-vs-private repo notes).
+**Run the crawl locally** (recommended). Home IPs get real data from Chinese news
+sites; cloud/datacenter IPs are throttled. Cross-platform entry point:
+```
+python run_weekly.py                 # RSS-only (fast)
+python run_weekly.py --with-search   # + bounded on-site search (home IP)
+python run_weekly.py --publish       # also push data + dashboard to GitHub Pages
+```
+
+- **Local setup + scheduling (Mac & Windows):** `deploy/local_setup.md` — the main
+  guide, including student handoff to a Windows PC.
+- **Mac scheduler (launchd):** `deploy/launchd_setup.md`.
+- **Dashboard hosting + WordPress embed:** `deploy/wordpress_embed.md` (GitHub Pages
+  serves `docs/index.html`; iframe it into rolandkays.com).
+- **Cloud scheduler (optional):** `.github/workflows/weekly.yml` runs the pipeline
+  weekly on GitHub Actions. Note: RSS-only there returns little from mainland sites
+  due to datacenter-IP throttling — prefer local runs for real coverage; use Actions
+  only to keep the Pages dashboard live if you can't run locally.
 
 ## The bot-blocking reality (read `docs/`)
 
