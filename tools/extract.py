@@ -154,7 +154,7 @@ def to_row(parsed: dict, url: str, model: str, discovered_date: str = "", title:
 # ---- backends ----
 def extract_with_anthropic(article_text, model=None, hint_species=None, title=None, client=None):
     import anthropic
-    model = model or os.environ.get("HWC_EXTRACT_MODEL", "claude-3-5-haiku-latest")
+    model = model or os.environ.get("HWC_EXTRACT_MODEL", "claude-haiku-4-5")
     client = client or anthropic.Anthropic()
     msg = client.messages.create(
         model=model, max_tokens=700, system=build_system(),

@@ -24,7 +24,8 @@ Run from the repo root. Each script has `--help`.
 | Store    | `50_store.py`    | Join geocode, year/month fallback from pubdate, dedup, append confident rows to master, queue borderline rows for review |
 | Dashboard| `build_dashboard.py` | Rebuild the self-contained HTML dashboard from the master store |
 
-`run_weekly.sh` chains all stages for the scheduled job.
+`run_weekly.py` chains all stages (cross-platform: Mac/Windows/Linux). See
+Deployment below. (`run_weekly.sh` is a bash-only equivalent kept for reference.)
 
 ### Human review (recall-favoring policy)
 

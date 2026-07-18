@@ -31,7 +31,7 @@ crawl runs locally — see "Publishing" below. You do not have to use it.
 4. **Add your Anthropic API key.** Copy `.env.example` to `.env` and fill in:
    ```
    ANTHROPIC_API_KEY=sk-ant-...
-   HWC_EXTRACT_MODEL=claude-3-5-haiku-latest
+   HWC_EXTRACT_MODEL=claude-haiku-4-5
    GEOCODE_CONTACT_EMAIL=you@example.com
    ```
    (The key comes from https://console.anthropic.com → API Keys. `.env` is

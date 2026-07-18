@@ -45,7 +45,7 @@ def main():
         sys.exit("ERROR: ANTHROPIC_API_KEY not set (env or .env). See .env.example.")
     import anthropic
     client = anthropic.Anthropic()
-    model = args.model or "claude-3-5-haiku-latest"
+    model = args.model or "claude-haiku-4-5"
 
     con = cache.connect()
     rows = con.execute("SELECT url, text, title, pub_date FROM fetched WHERE status='ok' AND length(text)>80").fetchall()

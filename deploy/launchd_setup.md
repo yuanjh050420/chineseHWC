@@ -9,7 +9,7 @@ IP, which those sites generally allow.
 1. Put your key in the repo's `.env` (copy `.env.example`), e.g.:
    ```
    ANTHROPIC_API_KEY=sk-ant-...
-   HWC_EXTRACT_MODEL=claude-3-5-haiku-latest
+   HWC_EXTRACT_MODEL=claude-haiku-4-5
    GEOCODE_CONTACT_EMAIL=you@example.com
    ```
 2. Create the launch agent file at
