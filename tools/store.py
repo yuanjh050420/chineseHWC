@@ -38,6 +38,9 @@ def seed_from_published(force: bool = False) -> pd.DataFrame:
     df["extract_model"] = ""
     df["extract_confidence"] = ""
     df["title"] = ""
+    df["summary_en"] = ""
+    df["summary_zh"] = ""
+    df["image_url"] = ""
     df["needs_review"] = 0
     # geocoding provenance: these coords were placed MANUALLY via Google Maps to
     # township precision, as bare points; we record that regime and leave the
@@ -60,6 +63,12 @@ _TEXTUAL = ["Number of victems", "Number of deaths", "No.", "Year", "Month",
 
 def write(df: pd.DataFrame):
     MASTER_PARQUET.parent.mkdir(parents=True, exist_ok=True)
+    df = df.copy()
+    # tolerate schema additions: any column in the current schema that an older
+    # master lacks is created blank, so re-writes never KeyError after a schema bump.
+    for c in columns():
+        if c not in df.columns:
+            df[c] = pd.NA
     df = df[columns()].copy()
     # normalize mixed-type columns to nullable string to keep parquet/csv stable
     for c in _TEXTUAL:

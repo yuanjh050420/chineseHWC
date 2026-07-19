@@ -3,6 +3,29 @@
 You told us you don't know much about web crawling and that sites block bots.
 Here's what this tool does about it, in plain terms.
 
+## Expect quiet weeks — this is correct, not broken
+
+Human–large-carnivore conflict is a **rare event**. The source manuscript found
+520 incidents across the whole of China over **20 years** — roughly one incident
+every two weeks nationally. So in any given weekly run it is entirely normal for
+the pipeline to find **few or zero** new incidents, even after fetching hundreds
+of articles. The working RSS feeds (People's Daily, China Daily, LTN, ettoday)
+are general national/Taiwan news firehoses; the extractor correctly rejects the
+overwhelming majority — sports, lottery, entertainment, politics — because they
+are not carnivore-conflict stories. A run that reads 600 articles and keeps 0 is
+the extractor doing its job, not a failure.
+
+**Project decision (Roland, Jul 2026): accept this low volume as the true base
+rate.** We deliberately do NOT enable general search-engine aggregators (e.g.
+Google News) to inflate the count, to keep the data high-quality and consistent
+with the manuscript's named-source methodology. Incidents accumulate slowly and
+honestly. If a genuine conflict story exists only on a non-RSS mainland site, we
+may miss it — that is an accepted limitation, not a bug to fix.
+
+To sanity-check a quiet run, look at the exclusion reasons in the `extracted`
+cache table — they should read like "sports article", "lottery result",
+"entertainment news", confirming the extractor read and understood each article.
+
 ## The core principle: be a polite guest, not an intruder
 
 We do **not** try to defeat blocks. We don't solve CAPTCHAs, we don't spoof to

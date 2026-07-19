@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS fetched (
     text          TEXT,          -- extracted main article text (trafilatura)
     title         TEXT,
     pub_date      TEXT,          -- publication date (page metadata or RSS), critical for year/month
+    image_url     TEXT,          -- representative image (og:image) for dashboard popup thumbnails
     error         TEXT
 );
 CREATE TABLE IF NOT EXISTS discovered (
@@ -58,12 +59,28 @@ CREATE TABLE IF NOT EXISTS source_liveness (
 """
 
 
+# Columns added after the initial schema shipped. CREATE TABLE IF NOT EXISTS does
+# NOT alter an existing table, so we additively migrate old caches here.
+_MIGRATIONS = {
+    "fetched": [("image_url", "TEXT")],
+}
+
+def _migrate(con):
+    for table, cols in _MIGRATIONS.items():
+        have = {r[1] for r in con.execute(f"PRAGMA table_info({table})").fetchall()}
+        for name, decl in cols:
+            if name not in have:
+                con.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
+    con.commit()
+
+
 def connect(path: Path | None = None) -> sqlite3.Connection:
     p = path or CACHE_PATH
     p.parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(str(p), timeout=30)
     con.row_factory = sqlite3.Row
     con.executescript(_SCHEMA)
+    _migrate(con)
     return con
 
 
@@ -73,11 +90,11 @@ def get_fetched(con, url: str):
 
 
 def save_fetched(con, url, status, http_code=None, final_url=None, text=None, title=None,
-                 pub_date=None, error=None):
+                 pub_date=None, image_url=None, error=None):
     con.execute(
-        "INSERT OR REPLACE INTO fetched(url,status,http_code,fetched_at,final_url,text,title,pub_date,error) "
-        "VALUES(?,?,?,?,?,?,?,?,?)",
-        (url, status, http_code, time.time(), final_url, text, title, pub_date, error),
+        "INSERT OR REPLACE INTO fetched(url,status,http_code,fetched_at,final_url,text,title,pub_date,image_url,error) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?)",
+        (url, status, http_code, time.time(), final_url, text, title, pub_date, image_url, error),
     )
     con.commit()
 

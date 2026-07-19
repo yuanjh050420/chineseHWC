@@ -48,7 +48,7 @@ def main():
     model = args.model or "claude-haiku-4-5"
 
     con = cache.connect()
-    rows = con.execute("SELECT url, text, title, pub_date FROM fetched WHERE status='ok' AND length(text)>80").fetchall()
+    rows = con.execute("SELECT url, text, title, pub_date, image_url FROM fetched WHERE status='ok' AND length(text)>80").fetchall()
 
     def done(u):
         return con.execute("SELECT 1 FROM extracted WHERE url=?", (u,)).fetchone() is not None
@@ -76,6 +76,9 @@ def main():
         if row is not None:
             row["_needs_review"] = bool(needs_review)
             row["pub_date"] = r["pub_date"]
+            # og:image captured at fetch time — used for popup thumbnails
+            try: row["image_url"] = r["image_url"] or ""
+            except (KeyError, IndexError): row["image_url"] = ""
         reason = parsed.get("exclude_reason") if not include else ("needs_review" if needs_review else "ok")
         cache.save_extracted(con, r["url"], include, row, model, reason)
         counts["include"] += int(include); counts["exclude"] += int(not include)

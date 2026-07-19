@@ -26,6 +26,9 @@ provenance_columns:
   - extract_model     # LLM model id used for extraction (blank for seed)
   - extract_confidence # 0-1 model self-reported confidence (blank for seed)
   - title             # article headline as discovered
+  - summary_en        # one-sentence English description of the incident (for map popups)
+  - summary_zh        # one-sentence Chinese description of the incident (for bilingual map popups)
+  - image_url         # representative image URL scraped from the article (og:image), for popup thumbnails
   - needs_review      # 1 if flagged for human review (low confidence / ambiguous); recall-favoring policy
   # -- Geocoding provenance (gazetteer point-radius method; see docs/crawling_notes + geocode-news skill) --
   # IMPORTANT: the 520 historical rows were geocoded MANUALLY via Google Maps to township precision,

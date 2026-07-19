@@ -24,6 +24,8 @@ _FIELDS = {
     "victim": "victim type in English (Human, Sheep, Cow, Goat, Yak, Horse, Camel, Pig, Dog, Chicken, Duck, Goose, ...); compound like 'Goose+Duck' allowed; null if none",
     "number_of_victims": "integer count of animals/people affected, or null",
     "number_of_deaths": "integer count of deaths, or null",
+    "summary_en": "one concise English sentence describing what happened in this incident (what animal, what it did, where, casualties), or null if include=false",
+    "summary_zh": "one concise Chinese (简体/繁體 as in the article) sentence describing what happened, or null if include=false",
     "confidence": "your 0-1 confidence in this extraction",
 }
 
@@ -52,12 +54,19 @@ Guidance on conflict_type:
 - "Damage crops": crops/orchards damaged.
 Pick the single PRIMARY conflict of the incident.
 
-THREE INCLUSION CRITERIA (all must hold for include=true):
+FOUR INCLUSION CRITERIA (all must hold for include=true):
 1. Professional media report with accurate time (>= month) AND accurate location (>= township).
 2. Reflects a NEGATIVE impact of a WILD carnivore on people/property. EXCLUDE zoo/captive
    animals, roadkill, mere sightings with no impact, and misidentified non-carnivores.
 3. For events without direct damage (e.g. sightings), the animal must be in a human-dominated
    landscape (village, farmland, road, residential) — NOT remote wilderness or PA core zones.
+4. GEOGRAPHIC SCOPE — the incident MUST have occurred in MAINLAND CHINA, TAIWAN, HONG KONG,
+   or MACAU. EXCLUDE incidents in any other country (Nepal, India, Russia, Mongolia, Bhutan,
+   Myanmar, etc.), even if a Chinese-language outlet reported them. If the location is a
+   foreign country, or the article is about foreign policy/insurance/statistics that merely
+   mentions attacks abroad, set include=false with exclude_reason="outside China/Taiwan".
+   ALSO EXCLUDE articles that are primarily about POLICY, LAW, INSURANCE, COMPENSATION SCHEMES,
+   STATISTICS, or RESEARCH rather than reporting ONE specific conflict incident.
 
 DATE OF THE INCIDENT (critical — this is often wrong):
 - Extract the year/month the CONFLICT HAPPENED, not the article's publication date and
@@ -148,6 +157,9 @@ def to_row(parsed: dict, url: str, model: str, discovered_date: str = "", title:
         "extract_model": model,
         "extract_confidence": parsed.get("confidence"),
         "title": title or parsed.get("title") or "",
+        "summary_en": parsed.get("summary_en") or "",
+        "summary_zh": parsed.get("summary_zh") or "",
+        "image_url": "",  # filled from the fetched cache (og:image) at extract stage, not by the LLM
     }
 
 
