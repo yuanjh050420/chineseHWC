@@ -15,12 +15,15 @@ overwhelming majority — sports, lottery, entertainment, politics — because t
 are not carnivore-conflict stories. A run that reads 600 articles and keeps 0 is
 the extractor doing its job, not a failure.
 
-**Project decision (Roland, Jul 2026): accept this low volume as the true base
-rate.** We deliberately do NOT enable general search-engine aggregators (e.g.
-Google News) to inflate the count, to keep the data high-quality and consistent
-with the manuscript's named-source methodology. Incidents accumulate slowly and
-honestly. If a genuine conflict story exists only on a non-RSS mainland site, we
-may miss it — that is an accepted limitation, not a bug to fix.
+**Project decision (Roland, Jul 2026):** curated named sources give clean, honest,
+manuscript-consistent data but accumulate slowly, and neither RSS (recent, little
+HWC) nor archive search (real HWC, but years old) reliably surfaces *recent*
+incidents. To reach recent conflict stories from mainland outlets whose own search
+is blocked to us, Google News has since been **ENABLED** as a dedicated recency
+channel (see the "Google News — the recency channel" section below). Curated
+sources remain primary; Google News supplements them, and every hit still passes
+the strict extractor (China/Taiwan scope + study criteria) and the 12-month cutoff.
+Even so, quiet stretches from the curated channels alone are expected and correct.
 
 To sanity-check a quiet run, look at the exclusion reasons in the `extracted`
 cache table — they should read like "sports article", "lottery result",
@@ -71,10 +74,37 @@ left off and only retries what failed.
 
 ## If recall feels too low
 
-The curated + RSS approach is deliberately conservative (your choice: "named
-sites + RSS only"). If weekly volume is lower than you want, options in order:
-1. Add more outlets to `config/sources.yaml` (copy an existing entry).
-2. Enable the Google News RSS fallback (`google_news_rss.enabled: true`) — it's
-   a general-engine aggregator that accepts the same species×keyword queries and
-   returns far more candidates, at the cost of stepping outside the curated list.
+The curated named-source + RSS channels are deliberately conservative and
+high-precision. If volume is lower than you want, options in order:
+1. Run the Google News recency channel (now ENABLED) — see the section below. This
+   is the primary lever for recent volume and reaches outlets we can't search directly.
+2. Add more outlets to `config/sources.yaml` (copy an existing entry).
 3. Run the fetch stage on your Mac (home IP) for sites that block the cloud.
+
+## Google News — the recency channel (ENABLED)
+
+Backfill via each outlet's own search reaches OLD archives (it surfaced real
+incidents from 2001–2021), and RSS carries only recent-but-mostly-non-HWC news.
+Neither reliably delivers *recent* human–carnivore conflict. Google News fills
+that gap: it aggregates recent stories from mainland outlets whose own search is
+blocked to us, and its `when:1y` operator restricts results to the past year.
+
+Status: **enabled** (`google_news_rss.enabled: true`). Run it on its own with:
+
+    python 10_discover.py --google-news-only     # skip curated outlets, Google News only
+
+Two things to know:
+  - VOLUME: up to ~100 items per query × ~190 queries is ~19,000 raw hits, but
+    heavy cross-query duplication (the same story matches many terms) collapses
+    that to a smaller set of unique URLs after dedup — plan for several thousand
+    candidates to fetch, not tens of thousands. Fetch is long and extraction costs
+    real API calls (one call per unique article). Fully resumable.
+  - NOISE: many hits are foreign (Japan's bear surge, Nepal, Europe). The
+    extractor's China/Taiwan geographic-scope criterion rejects these, so expect
+    a large `exclude` count — that's the filter working, not a problem.
+  Everything still passes the strict extractor + the 12-month store cutoff.
+
+  robots.txt note: Google News' robots.txt disallows /rss/search. We apply a
+  NARROW, documented exemption for THIS feed host only (`google_news_rss.robots_exempt:
+  true`); every other site remains fully robots-respecting. A scoped decision to
+  read a public syndication feed — revisit if the project's policy stance changes.

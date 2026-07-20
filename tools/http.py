@@ -91,10 +91,16 @@ def _get(url: str, ua: str) -> requests.Response:
                         timeout=_TIMEOUT, allow_redirects=True)
 
 
-def fetch(url: str) -> requests.Response:
+def fetch(url: str, robots_exempt: bool = False) -> requests.Response:
     """Fetch one URL politely. Raises Blocked on anti-bot pages, requests
-    exceptions on hard failures. Caller handles caching/status."""
-    if not _robots_ok(url):
+    exceptions on hard failures. Caller handles caching/status.
+
+    robots_exempt: skip the robots.txt check for THIS request only. Reserved for
+    explicitly-configured public syndication feeds (e.g. the Google News RSS feed,
+    config google_news_rss.robots_exempt) — a deliberate, documented per-source
+    decision, NOT a general bypass. Rate limiting and bot-block detection still apply.
+    """
+    if not robots_exempt and not _robots_ok(url):
         raise Blocked(f"robots.txt disallows {url}")
     _rate_limit(_host(url))
     ua = random.choice(_UAS)

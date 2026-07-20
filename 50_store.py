@@ -40,8 +40,33 @@ def _year_month_from_date(s):
         pass
     return None, None
 
-def build_rows(con):
-    """Return (master_rows_df, review_rows_df) assembled from the caches."""
+def _too_old(d, max_age_months):
+    """True if the incident date is older than the cutoff. Uses Year/Month; if the
+    year is unknown we KEEP it (don't drop for missing data — recall-favoring)."""
+    if not max_age_months:
+        return False
+    yr = d.get("Year")
+    try:
+        yr = int(yr)
+    except (TypeError, ValueError):
+        return False  # unknown year -> keep, let review handle it
+    mo = d.get("Month")
+    try:
+        mo = int(mo)
+    except (TypeError, ValueError):
+        mo = 6  # mid-year if month unknown
+    inc = dt.date(yr, min(max(mo, 1), 12), 1)
+    cutoff = dt.date.today() - dt.timedelta(days=int(max_age_months * 30.44))
+    return inc < cutoff
+
+def build_rows(con, max_age_months=0):
+    """Return (master_rows_df, review_rows_df) assembled from the caches.
+
+    max_age_months: if >0, incidents dated older than this are DROPPED (not stored).
+    This enforces the retrospective boundary (e.g. 'back one year, not further') on
+    the INCIDENT date, after extraction — the right place, since discovery via
+    on-site search has no date. Incidents with an unknown year are kept for review.
+    """
     ex = con.execute("SELECT url, row_json, reason FROM extracted WHERE include=1").fetchall()
     # geocode lookup by place_key
     geo = {r["place_key"]: r for r in con.execute("SELECT * FROM geocoded").fetchall()}
@@ -72,6 +97,9 @@ def build_rows(con):
             fy, fm = _year_month_from_date(pubdate)
             if not d.get("Year") and fy: d["Year"] = fy
             if not d.get("Month") and fm: d["Month"] = fm
+        # age cutoff (retrospective boundary): drop incidents older than the window
+        if _too_old(d, max_age_months):
+            continue
         # normalize provenance defaults
         d.setdefault("source", "monitor")
         d.setdefault("needs_review", 0)
@@ -96,6 +124,9 @@ def _assign_ids(df, existing):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--promote", action="store_true", help="move approved review_queue.csv rows into master")
+    ap.add_argument("--max-age-months", type=int, default=0,
+                    help="drop incidents dated older than this many months (0=keep all). "
+                         "Use with --backfill discovery to bound the retrospective window, e.g. 12 for one year.")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
     con = cache.connect()
@@ -112,7 +143,9 @@ def main():
         REVIEW_CSV.unlink()
         return
 
-    master_new, review_new = build_rows(con)
+    master_new, review_new = build_rows(con, max_age_months=args.max_age_months)
+    if args.max_age_months:
+        print(f"[store] age cutoff: dropping incidents older than {args.max_age_months} months")
     print(f"[store] assembled: {len(master_new)} auto-accept, {len(review_new)} need review")
     if args.dry_run:
         print("[store] dry run — nothing written"); return

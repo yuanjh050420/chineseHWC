@@ -11,6 +11,21 @@ Examples:
   python run_weekly.py                 # RSS-only weekly run (fast, reliable)
   python run_weekly.py --with-search   # add bounded on-site search (home IP)
   python run_weekly.py --publish       # also git-commit+push data + dashboard
+  python run_weekly.py --backfill      # ONE-TIME retrospective build-up (last ~year)
+
+BACKFILL: run this ONCE from a home IP to seed the dashboard with the past year of
+incidents before switching to routine weekly runs. It does a thorough on-site search
+(the only channel that reaches older articles) and keeps incidents up to --months old
+(default 12), enforced at the store stage on the incident date.
+
+It is MUCH slower than a weekly run. On-site search is capped at 10 minutes PER SOURCE
+(config: backfill_search_time_budget_s), and there are ~19 sources, so discovery alone
+can run up to ~3 hours worst-case if every outlet is slow (most finish far quicker —
+sites that block or have no search return in seconds). Fetch + extract of whatever it
+finds adds more. Plan for a long run: leave it going, e.g. overnight. It is fully
+resumable — if interrupted, just run it again and already-done work is skipped.
+To bound the time, you can cap the search with --search-time-budget on 10_discover.py,
+or run outlets in batches with --sources.
 """
 import argparse, subprocess, sys, datetime as dt
 from pathlib import Path
@@ -28,16 +43,26 @@ def run(stage, *extra):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--with-search", action="store_true", help="enable bounded on-site search (recommended on a home IP)")
+    ap.add_argument("--backfill", action="store_true", help="ONE-TIME retrospective build-up (thorough search, keeps last --months)")
+    ap.add_argument("--months", type=int, default=12, help="retrospective window in months for --backfill (default 12)")
     ap.add_argument("--publish", action="store_true", help="git add/commit/push data + dashboard after the run")
     args = ap.parse_args()
 
-    print(f"=== chineseHWC weekly run {dt.datetime.now().strftime('%Y-%m-%dT%H:%M')} local ===")
-    discover_flags = ["--weekly"] + (["--with-search"] if args.with_search else [])
-    run("10_discover.py", *discover_flags)
-    run("20_fetch.py")
-    run("30_extract.py")
-    run("40_geocode.py")
-    run("50_store.py")
+    mode = "backfill" if args.backfill else "weekly"
+    print(f"=== chineseHWC {mode} run {dt.datetime.now().strftime('%Y-%m-%dT%H:%M')} local ===")
+    if args.backfill:
+        run("10_discover.py", "--backfill")
+        run("20_fetch.py")
+        run("30_extract.py")
+        run("40_geocode.py")
+        run("50_store.py", "--max-age-months", str(args.months))
+    else:
+        discover_flags = ["--weekly"] + (["--with-search"] if args.with_search else [])
+        run("10_discover.py", *discover_flags)
+        run("20_fetch.py")
+        run("30_extract.py")
+        run("40_geocode.py")
+        run("50_store.py")
     run("build_dashboard.py")
     print("\n=== done. master + dashboard updated; review_queue.csv holds pending rows ===")
 

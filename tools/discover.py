@@ -15,10 +15,10 @@ from . import http, cache
 from .config import all_sources, sources as _sources, build_queries
 
 
-def probe_feed(url: str) -> tuple[bool, int, list[dict]]:
+def probe_feed(url: str, robots_exempt: bool = False) -> tuple[bool, int, list[dict]]:
     """Fetch+parse an RSS/Atom feed. Returns (ok, n_items, items)."""
     try:
-        resp = http.fetch(url)
+        resp = http.fetch(url, robots_exempt=robots_exempt)
         if resp.status_code >= 400:
             return False, 0, []
         fp = feedparser.parse(resp.content)
@@ -139,18 +139,41 @@ def discover_search(con, source: dict, queries: list[dict], max_per_source: int,
 
 
 def discover_google_news(con, queries: list[dict], max_items: int) -> int:
-    """OFF by default. Opt-in fallback: general-engine aggregator."""
+    """General-engine aggregator (opt-in via config). Reaches RECENT stories from
+    outlets whose own search is blocked to us. A `when:` recency operator (config
+    recency_when, e.g. '1y') is appended to each query so results favor the last year.
+    Every hit still passes the strict extractor + the store-stage age cutoff."""
     cfg = _sources().get("google_news_rss", {})
     if not cfg.get("enabled"):
         return 0
     ep = cfg["endpoint"]
+    when = (cfg.get("recency_when") or "").strip()
+    cap = int(cfg.get("max_items_per_query", max_items) or max_items)
+    exempt = bool(cfg.get("robots_exempt"))
     rows = []
-    for q in queries:
-        url = ep.replace("{q}", urllib.parse.quote(q["query"]))
-        ok, n, items = probe_feed(url)
-        for it in items[:max_items]:
-            rows.append({"url": it["url"], "source_key": "google_news",
-                         "title": it["title"], "pubdate": it["pubdate"], "query": q["query"]})
-    cache.save_discovered(con, rows)
+    total = len(queries)
+    # All queries hit one host (news.google.com) under a per-host rate limit, so this
+    # loop is slow and would otherwise be silent for many minutes — print progress and
+    # persist incrementally so a Ctrl-C loses nothing (save_discovered dedups on re-run).
+    for i, q in enumerate(queries, 1):
+        # Google News honors the `when:` operator inside the q= term (e.g. "熊 袭击 when:1y").
+        term = f'{q["query"]} when:{when}' if when else q["query"]
+        url = ep.replace("{q}", urllib.parse.quote(term))
+        ok, n, items = probe_feed(url, robots_exempt=exempt)
+        batch = [{"url": it["url"], "source_key": "google_news",
+                  "title": it["title"], "pubdate": it["pubdate"], "query": q["query"]}
+                 for it in items[:cap]]
+        if batch:
+            cache.save_discovered(con, batch)   # incremental persist (resumable/safe)
+            rows.extend(batch)
+        if i % 10 == 0 or i == total:
+            print(f"[google_news] {i}/{total} queries · {len(rows)} hits so far", flush=True)
+    # Decode the Google redirect tokens to real publisher URLs so the fetch stage can
+    # actually reach the articles (and provenance points at the outlet, not Google).
+    from . import gnews
+    stats = gnews.resolve_gnews(con)
+    if not stats.get("skipped"):
+        print(f"[google_news] resolved links: decoded={stats['decoded']} "
+              f"merged={stats['merged']} failed={stats['failed']}", flush=True)
     cache.log_liveness(con, "google_news", ep, "rss", len(rows) > 0, len(rows))
     return len(rows)

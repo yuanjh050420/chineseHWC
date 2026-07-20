@@ -16,6 +16,7 @@ Examples:
   ./20_fetch.py --workers 8
   ./20_fetch.py --source chinanews  # only candidates from one outlet
 """
+from __future__ import annotations  # py3.9: keep `str | None` hints lazy (user's Mac is 3.9.6)
 import argparse, sys, threading
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed

@@ -35,7 +35,27 @@ def main():
     ap.add_argument("--search-max-queries", type=int, default=0, help="cap on-site search terms per source (0=config default)")
     ap.add_argument("--search-time-budget", type=float, default=0, help="wall-clock seconds per source for on-site search (0=config default)")
     ap.add_argument("--with-search", action="store_true", help="enable on-site search sweep (weekly runs are RSS-only unless set; search is bounded and best from a home IP)")
+    ap.add_argument("--backfill", action="store_true",
+                    help="RETROSPECTIVE build-up: full recency window + thorough on-site search "
+                         "(all species×keyword queries, generous per-site time budget). On-site search "
+                         "is the ONLY channel that reaches back in time; RSS carries only recent items. "
+                         "Run once from a home IP to seed the last ~year. Slower than a weekly run.")
+    ap.add_argument("--resolve-gnews", action="store_true",
+                    help="decode any Google News redirect links already in the cache into real "
+                         "publisher URLs, then exit (no crawling). Run this to repair a prior "
+                         "--google-news-only run whose links weren't decoded.")
+    ap.add_argument("--google-news-only", action="store_true",
+                    help="query ONLY the Google News aggregator (skip all curated-outlet RSS + on-site "
+                         "search). Use to chase RECENT items from outlets whose own search is blocked; "
+                         "Google News is time-sortable so this targets the last year. Requires "
+                         "google_news_rss.enabled: true in config/sources.yaml.")
     args = ap.parse_args()
+    # Backfill: reach back as far as each outlet's search allows. Implies full window
+    # + forced search sweep with the per-site caps lifted (weekly caps exist only to
+    # keep the routine run fast; a one-time backfill should be thorough).
+    if args.backfill:
+        args.full = True
+        args.with_search = True
     # Weekly runs default to RSS-only: RSS is the primary channel and reliable from
     # any IP, while on-site search is slow and low-yield from datacenter IPs. Enable
     # search explicitly with --with-search (recommended when running from a home IP).
@@ -46,11 +66,21 @@ def main():
     lookback = st.get("weekly_lookback_days") if args.weekly and not args.full else None
     queries = build_queries()
     srcs = all_sources()
-    if args.sources:
+    if args.google_news_only:
+        srcs = []  # skip every curated outlet; only the Google News block below runs
+    elif args.sources:
         want = set(args.sources.split(","))
         srcs = [s for s in srcs if s["key"] in want]
 
     con = cache.connect()
+
+    # Repair mode: decode Google News redirect links already in the cache, then exit.
+    if args.resolve_gnews:
+        from tools import gnews
+        stats = gnews.resolve_gnews(con)
+        print(f"[resolve-gnews] {stats}")
+        return
+
     totals = {"rss": 0, "search": 0, "google_news": 0}
     for s in srcs:
         r = sr = 0
@@ -58,10 +88,16 @@ def main():
             r = discover.discover_rss(con, s, lookback)
         if not args.seed_liveness and not args.no_search:
             defs = discover._sources().get("defaults", {})
-            sr = discover.discover_search(
-                con, s, queries, s.get("max_candidates_per_source", 60),
-                max_queries=args.search_max_queries or defs.get("search_max_queries", 20),
-                time_budget_s=args.search_time_budget or defs.get("search_time_budget_s", 120))
+            if args.backfill:
+                # thorough one-time sweep: all queries, generous budget, more candidates/site
+                mq = args.search_max_queries or len(queries)
+                tb = args.search_time_budget or defs.get("backfill_search_time_budget_s", 600)
+                cap = defs.get("backfill_max_candidates_per_source", 300)
+            else:
+                mq = args.search_max_queries or defs.get("search_max_queries", 20)
+                tb = args.search_time_budget or defs.get("search_time_budget_s", 120)
+                cap = s.get("max_candidates_per_source", 60)
+            sr = discover.discover_search(con, s, queries, cap, max_queries=mq, time_budget_s=tb)
         totals["rss"] += r; totals["search"] += sr
         print(f"[discover] {s['key']:<12} rss={r:<4} search={sr:<4}", flush=True)
 

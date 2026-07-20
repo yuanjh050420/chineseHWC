@@ -23,6 +23,11 @@ defaults:
   # source. Without these, 190 queries x ~4s/query x 19 sites = hours.
   search_max_queries: 15          # top search terms per source per run
   search_time_budget_s: 90        # wall-clock seconds per source for on-site search
+  # --backfill (one-time retrospective build-up) lifts the weekly caps: on-site
+  # search is the ONLY channel that reaches older articles, so a backfill sweeps
+  # ALL species×keyword queries with a generous per-site budget. Slower by design.
+  backfill_search_time_budget_s: 600   # wall-clock seconds per source when --backfill
+  backfill_max_candidates_per_source: 300
   respect_robots: true
   user_agents:                    # rotated per request
     - "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36"
@@ -33,9 +38,17 @@ defaults:
 #      outlet list. The user chose "named news sites + RSS only"; enable this only
 #      if curated recall proves too low. Set enabled: true to opt in.
 google_news_rss:
-  enabled: false
+  # ENABLED as the recency channel (user decision). NOTE: Google News' robots.txt
+  # disallows /rss/search, so the crawler applies a NARROW, documented exemption for
+  # ONLY this Google News RSS host (robots_exempt below) — every other site is still
+  # fully robots-respecting. This is a deliberate, scoped choice to consume a public
+  # syndication feed; revisit before publication if the policy stance matters.
+  enabled: true
+  robots_exempt: true       # skip robots.txt for THIS feed host only (news.google.com RSS)
   endpoint: "https://news.google.com/rss/search?q={q}&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
-  note: "Aggregates general search results, not restricted to curated outlets. Opt-in fallback only."
+  recency_when: "1y"        # Google News `when:` operator — restrict to the past year (matches the 12-month store cutoff). "" to disable.
+  max_items_per_query: 20   # cap results kept per species×keyword query
+  note: "General-engine aggregator. Robots-exempt for this feed only; every hit still passes the strict extractor (China/Taiwan scope + study criteria) and the 12-month store cutoff."
 
 # ---- Curated mainland outlets. hist_hits = # of the 520 historical URLs whose
 #      registrable domain maps to this outlet (0 = named as plausible but not in
