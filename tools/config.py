@@ -14,7 +14,7 @@ DATA = ROOT / "data"
 
 @functools.lru_cache(maxsize=None)
 def _load(name: str) -> dict:
-    return yaml.safe_load((CONFIG / name).read_text())
+    return yaml.safe_load((CONFIG / name).read_text(encoding='utf-8'))
 
 
 def schema() -> dict:
